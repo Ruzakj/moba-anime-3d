@@ -26,8 +26,10 @@ jobs:
           cp -a /root/.local/share/godot/export_templates/4.4.1.stable "$HOME/.local/share/godot/export_templates/"
           mkdir -p "$HOME/.config/godot"
           cp /root/.config/godot/editor_settings-4.4.tres "$HOME/.config/godot/editor_settings-4.4.tres"
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" "platforms;android-35" "build-tools;35.0.0" >/dev/null
           test -f "$HOME/.local/share/godot/export_templates/4.4.1.stable/android_debug.apk"
           test -f /root/debug.keystore
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
           java -version
           test -x "$ANDROID_HOME/platform-tools/adb"
       - name: Import project
