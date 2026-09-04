@@ -1,21 +1,30 @@
 name: Godot Android APK
 on:
   push:
-    branches: [main]
+    branches: [main, feature/asset-upgrade]
   workflow_dispatch:
 
 concurrency:
-  group: godot-android-main
+  group: godot-android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     container:
       image: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify third-party assets
+        run: |
+          test -f third_party/kaykit_adventurers/addons/kaykit_character_pack_adventures/Characters/gltf/Knight.glb
+          test -f third_party/kaykit_adventurers/addons/kaykit_character_pack_adventures/Characters/gltf/Mage.glb
+          test -f third_party/kaykit_dungeon/addons/kaykit_dungeon_remastered/LICENSE.txt
+          test -f third_party/kenney_particle_pack/addons/kenney_particle_pack/magic_01.png
 
       - name: Prepare Godot Android toolchain
         run: |
@@ -32,21 +41,21 @@ jobs:
           test -x "$ANDROID_HOME/build-tools/34.0.0/apksigner"
 
       - name: Import project
-        run: timeout 45s godot --headless --editor --quit-after 3
+        run: timeout 90s godot --headless --editor --quit-after 5
 
       - name: Validate project
-        run: timeout 45s godot --headless -s res://tests/validate.gd
+        run: timeout 60s godot --headless -s res://tests/validate.gd
 
       - name: Playable match smoke test
-        run: timeout 45s godot --headless -s res://tests/match_smoke.gd
+        run: timeout 60s godot --headless -s res://tests/match_smoke.gd
 
       - name: Headless startup smoke test
-        run: timeout 45s godot --headless --path . --quit-after 3
+        run: timeout 60s godot --headless --path . --quit-after 3
 
       - name: Export Android debug package
         run: |
           mkdir -p build
-          timeout 180s godot --headless --verbose --export-debug "Android Debug" build/moba-anime-3d-debug.apk
+          timeout 240s godot --headless --verbose --export-debug "Android Debug" build/moba-anime-3d-debug.apk
           test -s build/moba-anime-3d-debug.apk
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose build/moba-anime-3d-debug.apk
 
