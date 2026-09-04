@@ -8,21 +8,26 @@ var red_base:=Vector3(0,0,-38)
 var wave_timer:=2.0
 var match_over:=false
 var match_time:=0.0
+var blue_kills:=0
+var red_kills:=0
 
 func _ready()->void:
+	GraphicsSettings.apply(get_viewport())
 	_build_environment();_build_lanes();_spawn_structures();_spawn_heroes();_make_camera();_make_hud()
 
 func _process(delta:float)->void:
 	if match_over:return
 	match_time+=delta;wave_timer-=delta
-	if wave_timer<=0.0:wave_timer=26.0;_spawn_wave()
+	if wave_timer<=0.0:
+		wave_timer=26.0
+		_spawn_wave()
 
 func _build_environment()->void:
 	var env=WorldEnvironment.new();var e=Environment.new();e.background_mode=Environment.BG_COLOR;e.background_color=Color("86b8c8");e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color.WHITE;e.ambient_light_energy=1.0;env.environment=e;add_child(env)
-	var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-55,-25,0);sun.shadow_enabled=false;sun.light_energy=1.2;add_child(sun)
+	var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-55,-25,0);sun.shadow_enabled=GraphicsSettings.quality!="LOW";sun.directional_shadow_max_distance=24.0;sun.light_energy=1.2;add_child(sun)
 	var ground=MeshInstance3D.new();var plane=PlaneMesh.new();plane.size=Vector2(78,92);var mat=StandardMaterial3D.new();mat.albedo_color=Color("75a95f");mat.roughness=1.0;plane.material=mat;ground.mesh=plane;add_child(ground)
 	var river=MeshInstance3D.new();var rp=PlaneMesh.new();rp.size=Vector2(78,8);var rm=StandardMaterial3D.new();rm.albedo_color=Color("4a9fbd");rm.roughness=.3;rp.material=rm;river.mesh=rp;river.position.y=.025;add_child(river)
-	var nav=NavigationRegion3D.new();nav.name="NavigationRegion3D";nav.navigation_mesh=NavigationMesh.new();add_child(nav)
+	var nav=NavigationRegion3D.new();nav.name="NavigationRegion3D";var nm=NavigationMesh.new();nm.set_vertices(PackedVector3Array([Vector3(-38,0,-44),Vector3(38,0,-44),Vector3(38,0,44),Vector3(-38,0,44)]));nm.add_polygon(PackedInt32Array([0,1,2,3]));nav.navigation_mesh=nm;add_child(nav)
 	for i in 34:
 		var x=randf_range(-34,34);var z=randf_range(-34,34)
 		if abs(x)<5 or abs(z)<5:continue
@@ -49,8 +54,7 @@ func _spawn_structure(team:int,pos:Vector3,core:bool)->void:
 	var s=StructureUnit.new();add_child(s);s.global_position=pos;s.setup(team,core);s.add_to_group("combatant");s.add_to_group("core" if core else "tower");s.died.connect(_on_structure_died)
 
 func _spawn_heroes()->void:
-	var catalog=HeroCatalog.all();var selected=HeroCatalog.get_by_id(MatchState.selected_hero_id)
-	player=_hero(selected,TEAM_BLUE,blue_base+Vector3(0,0,-4),true)
+	var catalog=HeroCatalog.all();var selected=HeroCatalog.get_by_id(MatchState.selected_hero_id);player=_hero(selected,TEAM_BLUE,blue_base+Vector3(0,0,-4),true)
 	var assign=["top","mid","bot","bot"]
 	for i in 4:_bot(_hero(catalog[(i+1)%30],TEAM_BLUE,blue_base+Vector3(-3+i*2,0,0)),assign[i])
 	var enemy_assign=["top","mid","bot","bot","top"]
@@ -76,6 +80,8 @@ func _spawn_wave()->void:
 				var m=MinionUnit.new();add_child(m);m.global_position=(blue_base if team==0 else red_base)+Vector3((i-1)*.8,0,0);m.setup(team,path);m.add_to_group("combatant")
 
 func _on_hero_died(h:ProceduralHero,spawn:Vector3)->void:
+	if h.team==TEAM_BLUE:red_kills+=1
+	else:blue_kills+=1
 	get_tree().create_timer(7.0).timeout.connect(func():h.revive(spawn))
 
 func _on_structure_died(s:StructureUnit)->void:
@@ -91,4 +97,5 @@ func _make_camera()->void:
 	var follow=Node.new();add_child(follow);follow.set_script(load("res://world/CameraFollow.gd"));follow.set("camera",cam);follow.set("target",player)
 
 func _make_hud()->void:
-	var layer=CanvasLayer.new();layer.name="CanvasLayer";add_child(layer);var hud=load("res://ui/hud/HUD.gd").new();layer.add_child(hud);hud.setup(player,self)
+	var layer=CanvasLayer.new();layer.name="CanvasLayer";add_child(layer)
+	var hud=load("res://ui/hud/HUD.gd").new();layer.add_child(hud);hud.setup(player,self)
