@@ -6,6 +6,7 @@ var player:ProceduralHero
 var blue_base:=Vector3(0,0,38)
 var red_base:=Vector3(0,0,-38)
 var wave_timer:=2.0
+var wave_count:=0
 var match_over:=false
 var match_time:=0.0
 var blue_kills:=0
@@ -70,14 +71,25 @@ func _bot(h:ProceduralHero,lane:String)->void:
 	ai.setup(h,path,blue_base if h.team==0 else red_base)
 
 func _spawn_wave()->void:
+	wave_count+=1
 	for lane in lanes:
 		for team in 2:
 			var source:Array=Array(lanes[lane]).duplicate()
 			if team==1:source.reverse()
 			var path:Array[Vector3]=[]
 			for p in source:path.append(p)
-			for i in 3:
-				var m=MinionUnit.new();add_child(m);m.global_position=(blue_base if team==0 else red_base)+Vector3((i-1)*.8,0,0);m.setup(team,path);m.add_to_group("combatant")
+			_spawn_minion(team,path,-1.0,"MELEE")
+			_spawn_minion(team,path,0.0,"MELEE")
+			_spawn_minion(team,path,1.0,"RANGED")
+			if wave_count%3==0:_spawn_minion(team,path,1.8,"SIEGE")
+
+func _spawn_minion(team:int,path:Array[Vector3],offset:float,kind:String)->void:
+	var m=MinionUnit.new();add_child(m);m.global_position=(blue_base if team==0 else red_base)+Vector3(offset,0,0);m.setup(team,path,kind);m.add_to_group("combatant");m.add_to_group("minion");m.died.connect(_on_minion_died)
+
+func _on_minion_died(m:MinionUnit)->void:
+	get_tree().create_timer(1.2).timeout.connect(func():
+		if is_instance_valid(m):m.queue_free()
+	)
 
 func _on_hero_died(h:ProceduralHero,spawn:Vector3)->void:
 	if h.team==TEAM_BLUE:red_kills+=1
