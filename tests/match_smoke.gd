@@ -15,10 +15,26 @@ func _run()->void:
 	assert(get_nodes_in_group("core").size()==2,"expected 2 cores")
 	assert(map.lanes.has("top") and map.lanes.has("mid") and map.lanes.has("bot"),"three lanes missing")
 	assert(map.get_node_or_null("NavigationRegion3D") is NavigationRegion3D,"navigation region missing")
+
 	map._spawn_wave()
 	await physics_frame
-	var minions:=get_nodes_in_group("combatant").filter(func(n):return n is MinionUnit)
+	var minions:=get_nodes_in_group("minion")
 	assert(minions.size()>=18,"minion wave failed")
+	var archetypes:Dictionary={}
+	for m in minions:archetypes[m.archetype]=true
+	assert(archetypes.has("MELEE"),"melee minion missing")
+	assert(archetypes.has("RANGED"),"ranged minion missing")
+	map._spawn_wave();map._spawn_wave()
+	await physics_frame
+	for m in get_nodes_in_group("minion"):archetypes[m.archetype]=true
+	assert(archetypes.has("SIEGE"),"siege minion missing on third wave")
+
+	var required_kinds={"TAUNT":false,"SHIELD":false,"KNOCKUP":false,"BARRIER":false,"DASH":false,"LIFESTEAL":false,"CONE":false,"EXECUTE":false,"BLINK":false,"MARK":false,"CHAIN":false,"PROJECTILE":false,"AREA":false,"ROOT":false,"AREA_DENIAL":false,"MULTISHOT":false,"ATTACK_SPEED":false,"CHARGE":false,"HEAL":false,"SLOW":false,"TEAM_BUFF":false}
+	for hero in HeroCatalog.all():
+		for skill in hero.skills:
+			if required_kinds.has(skill.kind):required_kinds[skill.kind]=true
+	for kind in required_kinds:assert(required_kinds[kind],"configured skill kind missing: "+kind)
+
 	var bots:Array=[]
 	for h in get_nodes_in_group("hero"):
 		if h!=map.player:bots.append(h)
@@ -36,5 +52,5 @@ func _run()->void:
 	red_core.apply_damage(999999.0,map.TEAM_BLUE,true)
 	await process_frame
 	assert(map.match_over,"victory condition failed")
-	print("MATCH SMOKE PASS: 10 heroes, 3 lanes, minions, towers, navigation, moving AI, victory")
+	print("MATCH SMOKE PASS: 10 heroes, 3 lanes, melee/ranged/siege minions, full skill palette, towers, navigation, moving AI, victory")
 	quit(0)
