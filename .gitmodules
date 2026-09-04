@@ -1,0 +1,9 @@
+[submodule "third_party/kaykit_adventurers"]
+	path = third_party/kaykit_adventurers
+	url = https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git
+[submodule "third_party/kaykit_dungeon"]
+	path = third_party/kaykit_dungeon
+	url = https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0.git
+[submodule "third_party/kenney_particle_pack"]
+	path = third_party/kenney_particle_pack
+	url = https://github.com/Calinou/kenney-particle-pack.git
