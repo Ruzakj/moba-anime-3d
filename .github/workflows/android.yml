@@ -7,18 +7,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     container:
       image: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
       - name: Import project
-        run: godot --headless --editor --quit-after 3
+        run: timeout 45s godot --headless --editor --quit-after 3
       - name: Validate project
-        run: godot --headless -s res://tests/validate.gd
+        run: timeout 45s godot --headless -s res://tests/validate.gd
       - name: Headless startup smoke test
-        run: godot --headless --path . --quit-after 3
+        run: timeout 45s godot --headless --path . --quit-after 3
       - name: Export Android debug package
-        run: mkdir -p build && godot --headless --export-debug "Android Debug" build/moba-anime-3d-debug.apk
+        run: mkdir -p build && timeout 180s godot --headless --export-debug "Android Debug" build/moba-anime-3d-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: moba-anime-3d-debug
