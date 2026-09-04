@@ -8,6 +8,7 @@ var _anim_t:=0.0
 var visual:Node3D
 var prop:MeshInstance3D
 var skeleton:Skeleton3D
+var marked_targets:Dictionary={}
 
 func setup(def:Dictionary,p_team:int,is_player:=false)->void:
 	definition=def
@@ -16,8 +17,7 @@ func setup(def:Dictionary,p_team:int,is_player:=false)->void:
 	_build_humanoid(int(def.variant))
 
 func _physics_process(delta:float)->void:
-	for i in 4:
-		cooldowns[i]=max(0.0,cooldowns[i]-delta)
+	for i in 4:cooldowns[i]=max(0.0,cooldowns[i]-delta)
 	if dead:return
 	if controlled_by_player:
 		var input:=Input.get_vector("move_left","move_right","move_up","move_down")
@@ -57,13 +57,8 @@ func _build_bones()->void:
 func _build_hair(v:int,c:Color)->void:
 	match v%5:
 		0:_part("Hair",Vector3(0,2.74,0),Vector3(0.62,0.30,0.62),c,"sphere")
-		1:
-			_part("Hair",Vector3(0,2.73,0),Vector3(0.60,0.26,0.60),c,"sphere")
-			_part("Ponytail",Vector3(0,2.35,0.38),Vector3(0.20,0.65,0.20),c,"capsule")
-		2:
-			_part("Hair",Vector3(0,2.72,0),Vector3(0.61,0.25,0.61),c,"sphere")
-			_part("TwinL",Vector3(-0.48,2.45,0.1),Vector3(0.16,0.55,0.16),c,"capsule")
-			_part("TwinR",Vector3(0.48,2.45,0.1),Vector3(0.16,0.55,0.16),c,"capsule")
+		1:_part("Hair",Vector3(0,2.73,0),Vector3(0.60,0.26,0.60),c,"sphere");_part("Ponytail",Vector3(0,2.35,0.38),Vector3(0.20,0.65,0.20),c,"capsule")
+		2:_part("Hair",Vector3(0,2.72,0),Vector3(0.61,0.25,0.61),c,"sphere");_part("TwinL",Vector3(-0.48,2.45,0.1),Vector3(0.16,0.55,0.16),c,"capsule");_part("TwinR",Vector3(0.48,2.45,0.1),Vector3(0.16,0.55,0.16),c,"capsule")
 		3:_part("HairSpike",Vector3(0,2.92,0),Vector3(0.30,0.55,0.30),c,"cylinder")
 		_:_part("Hair",Vector3(0,2.77,0),Vector3(0.66,0.37,0.66),c,"sphere")
 
@@ -107,41 +102,55 @@ func _animate_body(delta:float)->void:
 func basic_attack()->void:
 	var target=_nearest_enemy(attack_range)
 	if target:
-		target.apply_damage(attack_power,team)
+		var bonus:=1.35 if marked_targets.has(target.get_instance_id()) else 1.0
+		target.apply_damage(attack_power*bonus,team)
+		if bonus>1.0:marked_targets.erase(target.get_instance_id())
 		_play_cast_motion()
 
 func cast_skill(slot:int)->void:
 	if slot<0 or slot>3 or cooldowns[slot]>0.0:return
 	var s:Dictionary=definition.skills[slot];cooldowns[slot]=float(s.cooldown);_play_cast_motion()
-	var kind:String=s.kind;var target=_nearest_enemy(float(s.radius)+attack_range)
+	var kind:String=s.kind;var power:=float(s.power);var radius:=float(s.radius);var duration:=float(s.duration);var target=_nearest_enemy(radius+attack_range)
 	match kind:
-		"HEAL":heal(float(s.power));_heal_allies(float(s.power)*0.55,float(s.radius))
-		"SHIELD","BARRIER":shield+=float(s.power)*2.0
-		"DASH","BLINK":global_position+=-global_transform.basis.z*min(5.0,float(s.radius))
-		"TEAM_BUFF","ATTACK_SPEED":_temporary_speed_buff(0.45,float(s.duration))
-		"AREA","AREA_DENIAL","CONE","MULTISHOT","CHAIN":_damage_area(float(s.radius),float(s.power))
+		"HEAL":heal(power);_heal_allies(power*0.55,radius)
+		"SHIELD","BARRIER":shield+=power*2.0;_shield_allies(power*0.65,radius) if kind=="BARRIER" else null
+		"DASH","BLINK":global_position+=-global_transform.basis.z*min(5.0,radius)
+		"TEAM_BUFF","ATTACK_SPEED":_temporary_speed_buff(0.45,duration);_buff_allies(0.25,duration,radius) if kind=="TEAM_BUFF" else null
+		"AREA","AREA_DENIAL","CONE","MULTISHOT","CHAIN":_damage_area(radius,power)
+		"PROJECTILE":
+			if target:_projectile_attack(target,power,float(s.speed))
+		"MARK":
+			if target:marked_targets[target.get_instance_id()]=true;target.apply_damage(power*0.55,team)
+		"TAUNT":
+			_damage_area(radius,power*0.55);_slow_enemies(radius,0.65,duration)
+		"CHARGE":
+			if target:global_position=global_position.lerp(target.global_position,0.7);target.apply_damage(power*1.15,team)
 		"SLOW":
-			if target:_temporary_target_speed(target,0.55,float(s.duration));target.apply_damage(float(s.power),team)
+			if target:_temporary_target_speed(target,0.55,duration);target.apply_damage(power,team)
 		"ROOT":
-			if target:_temporary_target_speed(target,0.0,float(s.duration));target.apply_damage(float(s.power),team)
+			if target:_temporary_target_speed(target,0.0,duration);target.apply_damage(power,team)
 		"KNOCKUP":
-			if target:target.apply_damage(float(s.power),team);_knockup(target)
+			if target:target.apply_damage(power,team);_knockup(target)
 		"LIFESTEAL":
-			if target:target.apply_damage(float(s.power),team);heal(float(s.power)*0.45)
+			if target:target.apply_damage(power,team);heal(power*0.45)
 		"EXECUTE":
-			if target:target.apply_damage(float(s.power)*(1.7 if target.hp/target.max_hp<0.35 else 1.0),team)
+			if target:target.apply_damage(power*(1.7 if target.hp/target.max_hp<0.35 else 1.0),team)
 		_:
-			if target:target.apply_damage(float(s.power),team)
+			if target:target.apply_damage(power,team)
+
+func _projectile_attack(target,power:float,speed:float)->void:
+	if not is_instance_valid(target):return
+	var orb=MeshInstance3D.new();var sm=SphereMesh.new();sm.radius=0.16;sm.height=0.32;var mat=StandardMaterial3D.new();mat.albedo_color=Color("d8f2ff");mat.emission_enabled=true;mat.emission=mat.albedo_color;sm.material=mat;orb.mesh=sm;get_tree().current_scene.add_child(orb);orb.global_position=global_position+Vector3(0,1.4,0)
+	var travel=max(0.08,global_position.distance_to(target.global_position)/max(4.0,speed));var t=create_tween();t.tween_property(orb,"global_position",target.global_position+Vector3(0,1.0,0),travel);t.tween_callback(func():
+		if is_instance_valid(target):target.apply_damage(power,team)
+		if is_instance_valid(orb):orb.queue_free()
+	)
 
 func _temporary_speed_buff(amount:float,duration:float)->void:
-	move_speed+=amount
-	get_tree().create_timer(duration).timeout.connect(_restore_self_speed.bind(amount))
-func _restore_self_speed(amount:float)->void:
-	move_speed-=amount
+	move_speed+=amount;get_tree().create_timer(duration).timeout.connect(_restore_self_speed.bind(amount))
+func _restore_self_speed(amount:float)->void:move_speed-=amount
 func _temporary_target_speed(target,scale_factor:float,duration:float)->void:
-	var old:float=target.move_speed
-	target.move_speed=old*scale_factor
-	get_tree().create_timer(duration).timeout.connect(_restore_target_speed.bind(target,old))
+	var old:float=target.move_speed;target.move_speed=old*scale_factor;get_tree().create_timer(duration).timeout.connect(_restore_target_speed.bind(target,old))
 func _restore_target_speed(target,old:float)->void:
 	if is_instance_valid(target):target.move_speed=old
 func _knockup(target)->void:
@@ -159,6 +168,15 @@ func _damage_area(radius:float,power:float)->void:
 func _heal_allies(power:float,radius:float)->void:
 	for n in get_tree().get_nodes_in_group("combatant"):
 		if n.team==team and not n.dead and global_position.distance_to(n.global_position)<=radius:n.heal(power)
+func _shield_allies(power:float,radius:float)->void:
+	for n in get_tree().get_nodes_in_group("combatant"):
+		if n.team==team and not n.dead and global_position.distance_to(n.global_position)<=radius:n.shield+=power
+func _buff_allies(amount:float,duration:float,radius:float)->void:
+	for n in get_tree().get_nodes_in_group("hero"):
+		if n!=self and n.team==team and not n.dead and global_position.distance_to(n.global_position)<=radius:n._temporary_speed_buff(amount,duration)
+func _slow_enemies(radius:float,scale_factor:float,duration:float)->void:
+	for n in get_tree().get_nodes_in_group("combatant"):
+		if n!=self and n.team!=team and not n.dead and global_position.distance_to(n.global_position)<=radius:_temporary_target_speed(n,scale_factor,duration)
 func _play_cast_motion()->void:
 	if prop:
 		var start:=prop.rotation.z;var t=create_tween();t.tween_property(prop,"rotation:z",start+1.1,0.10);t.tween_property(prop,"rotation:z",start,0.14)
