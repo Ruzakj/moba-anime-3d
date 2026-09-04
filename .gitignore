@@ -1,0 +1,6 @@
+# Private/internal prototype assets must not be committed.
+private_assets/*.glb
+private_assets/*.gltf
+private_assets/*.bin
+private_assets/*.png
+private_assets/*.jpg
