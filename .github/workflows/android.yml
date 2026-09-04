@@ -16,6 +16,8 @@ jobs:
         run: timeout 45s godot --headless --editor --quit-after 3
       - name: Validate project
         run: timeout 45s godot --headless -s res://tests/validate.gd
+      - name: Playable match smoke test
+        run: timeout 45s godot --headless -s res://tests/match_smoke.gd
       - name: Headless startup smoke test
         run: timeout 45s godot --headless --path . --quit-after 3
       - name: Export Android debug package
