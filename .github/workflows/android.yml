@@ -4,14 +4,32 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: godot-android-main
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     container:
       image: barichello/godot-ci:4.4.1
+    env:
+      GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /root/debug.keystore
+      GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+      GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare Godot Android toolchain
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          cp -a /root/.local/share/godot/export_templates/4.4.1.stable "$HOME/.local/share/godot/export_templates/"
+          mkdir -p "$HOME/.config/godot"
+          cp /root/.config/godot/editor_settings-4.4.tres "$HOME/.config/godot/editor_settings-4.4.tres"
+          test -f "$HOME/.local/share/godot/export_templates/4.4.1.stable/android_debug.apk"
+          test -f /root/debug.keystore
+          java -version
+          test -x "$ANDROID_HOME/platform-tools/adb"
       - name: Import project
         run: timeout 45s godot --headless --editor --quit-after 3
       - name: Validate project
