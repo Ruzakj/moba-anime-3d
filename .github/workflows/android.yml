@@ -31,6 +31,20 @@ jobs:
           test -x "$ANDROID_HOME/platform-tools/adb"
           test -x "$ANDROID_HOME/build-tools/34.0.0/apksigner"
 
+      - name: Package Android signing tools
+        run: |
+          mkdir -p build/signing-tools
+          cp "$ANDROID_HOME/build-tools/34.0.0/apksigner" build/signing-tools/
+          cp "$ANDROID_HOME/build-tools/34.0.0/zipalign" build/signing-tools/
+          cp -a "$ANDROID_HOME/build-tools/34.0.0/lib" build/signing-tools/
+          cp -a "$ANDROID_HOME/build-tools/34.0.0/lib64" build/signing-tools/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-signing-tools
+          path: build/signing-tools
+          if-no-files-found: error
+
       - name: Import project
         run: timeout 45s godot --headless --editor --quit-after 3
 
