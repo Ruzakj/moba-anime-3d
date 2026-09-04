@@ -23,6 +23,53 @@ func configure(stats:Dictionary,p_team:int)->void:
 	defense=float(stats.defense)
 	move_speed=float(stats.move_speed)
 	attack_range=float(stats.attack_range)
+	# Private prototype models are intentionally not committed to this public repo.
+	# When a raw GLB is injected into the APK under assets/private_assets/, it is
+	# loaded at runtime and displayed over the procedural fallback.
+	call_deferred("_try_private_prototype_visual")
+
+func _try_private_prototype_visual()->void:
+	if not is_inside_tree():return
+	var def:Variant=get("definition")
+	if not (def is Dictionary):return
+	var variant:int=int(def.get("variant",0))
+	# Keep this experiment limited to a subset of heroes.
+	if variant%5>1:return
+	var model_name:="alucard_static.glb" if variant%2==0 else "badang_static.glb"
+	var path:="res://private_assets/%s"%model_name
+	if not FileAccess.file_exists(path):return
+	var document:=GLTFDocument.new()
+	var state:=GLTFState.new()
+	var err:=document.append_from_file(path,state)
+	if err!=OK:
+		push_warning("Private prototype GLB failed to load: %s (%s)"%[path,err])
+		return
+	var model:Node=document.generate_scene(state)
+	if model==null:return
+	var old_visual:=get_node_or_null("VisualRoot3D")
+	if old_visual:old_visual.visible=false
+	var holder:=Node3D.new()
+	holder.name="PrivateVisualRoot3D"
+	add_child(holder)
+	model.name="PrototypeCharacter"
+	holder.add_child(model)
+	# Source bundles use a Z-up bind mesh; rotate into Godot's Y-up world.
+	model.rotation_degrees.x=-90.0
+	var uniform_scale:=1.08 if variant%2==0 else 3.2
+	model.scale=Vector3.ONE*uniform_scale
+	_apply_prototype_material(model)
+
+func _apply_prototype_material(root:Node)->void:
+	var mat:=StandardMaterial3D.new()
+	mat.albedo_color=Color("9fc4ff") if team==0 else Color("ff9f9f")
+	mat.roughness=0.68
+	mat.metallic=0.05
+	var stack:Array[Node]=[root]
+	while not stack.is_empty():
+		var node:Node=stack.pop_back()
+		if node is MeshInstance3D:
+			(node as MeshInstance3D).material_override=mat
+		for child in node.get_children():stack.append(child)
 
 func apply_damage(amount:float,source_team:int,true_damage:bool=false)->void:
 	if dead or source_team==team:return
